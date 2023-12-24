@@ -88,11 +88,14 @@ class Board:
 
         for direction_offset in self.move_offsets[piece.lower()][0]:
             new_pos = piece_idx + direction_offset
+
             if (new_pos not in self.invalid_indexes) and (new_pos < len(self.board)):
                 new_pos_piece = self.board[new_pos]
+
                 if (new_pos_piece == '.') and (direction_offset not in (-11, -9)):
                     possible_moves.append(new_pos)
-                elif (piece.isupper() == new_pos_piece.islower()) and (direction_offset not in (-11, -9)):
+
+                elif (piece.isupper() == new_pos_piece.islower()) and (direction_offset in (-11, -9)):
                     possible_moves.append(new_pos)
         return possible_moves
 
@@ -102,9 +105,14 @@ class Board:
         for direction_offset in self.move_offsets[piece.lower()][0]:
             for offset_multiplier in range(1, self.move_offsets[piece.lower()][1] + 1):
                 new_pos = piece_idx + direction_offset * offset_multiplier
+
                 if (new_pos not in self.invalid_indexes) and (new_pos < len(self.board)):
                     new_pos_piece = self.board[new_pos]
-                    if (piece.isupper() == new_pos_piece.islower()) or (new_pos_piece == '.'):
+
+                    if piece.isupper() == new_pos_piece.islower():
+                        possible_moves.append(new_pos)
+                        break
+                    elif new_pos_piece == '.':
                         possible_moves.append(new_pos)
                     else:
                         break
