@@ -1,10 +1,14 @@
+import random
+
 
 class Move:
     def __init__(self, start: int, end: int, board) -> None:
         self.start = start
         self.end = end
         self.board = board
-        self.rating = 0
+        self.rating = 0.0
+        self.start_piece = self.board.board[self.start]
+        self.end_piece = self.board.board[self.end]
 
         self.piece_square_table = {
             'p': map(lambda x: x*10, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 1, 1, -2, -2, 1, 1, 5, 0, 0, 5, -5, -1, 0, 0, -1, -5, 5, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 5, 5, 1, 2.5, 2.5, 1, 5, 5, 0, 0, 1, 1, 2, 3, 3, 2, 1, 1, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -26,27 +30,23 @@ class Move:
         self.calculate_rating()
 
     def __repr__(self) -> str:
-        return f'{self.start} => {self.end}(Rating:{self.rating})'
+        return f'{self.start}[{self.start_piece}] => {self.end}[{self.end_piece}](Rating:{self.rating})'
 
     def calculate_rating(self) -> None:
-        start_piece = self.board.board[self.start]
-        end_piece = self.board.board[self.end]
         square_table_start_index = self.start
         square_table_end_index = self.end
-        start_piece_val = self.piece_value_map[start_piece.lower()]
-        end_piece_val = self.piece_value_map[end_piece.lower()]
+        start_piece_val = self.piece_value_map[self.start_piece.lower()]
+        end_piece_val = self.piece_value_map[self.end_piece.lower()]
 
-        if start_piece.islower():
-            square_table = list(reversed(self.piece_square_table[start_piece]))
+        if self.start_piece.islower():
+            square_table = list(
+                reversed(list(self.piece_square_table[self.start_piece])))
         else:
-            square_table = self.piece_square_table[start_piece.lower()]
-
-        print(square_table_start_index)
+            square_table = list(
+                self.piece_square_table[self.start_piece.lower()])
 
         if end_piece_val > start_piece_val:
             self.rating += end_piece_val
-        else:
-            self.rating += (start_piece_val + end_piece_val) // 2
 
         if square_table[square_table_end_index] > square_table[square_table_start_index]:
             self.rating += square_table[square_table_end_index] - \
@@ -59,8 +59,11 @@ class Move:
 
 
 class Board:
-    def __init__(self) -> None:
-        self.board = '''\
+    def __init__(self, string: str = '') -> None:
+        if string:
+            self.board = string
+        else:
+            self.board = '''\
          
  rnbqkbnr
  pppppppp
@@ -72,7 +75,6 @@ class Board:
  RNBQKBNR
          
 '''
-        print(len(self.board))
         self.invalid_indexes = list(filter(
             lambda x: x is not None, [i if n in '\n ' else None for i, n in enumerate(self.board)]))
         self.move_offsets = {
@@ -86,6 +88,15 @@ class Board:
         self.white_score = 0
         self.black_score = 0
         self.turn = 'w'
+        self.piece_value_map = {
+            'p': 1,
+            'n': 3,
+            'b': 3,
+            'r': 5,
+            'q': 9,
+            'k': 999999999,
+            '.': 0
+        }
 
     def __repr__(self) -> str:
         t = self.board.split('\n')
@@ -100,6 +111,19 @@ class Board:
 
         return out + '  ----------------\n   a b c d e f g h'
 
+    def calculate_score(self) -> None:
+        score = 0
+        for char in self.board:
+            if char.lower() in self.piece_value_map:
+                if (char.isupper()) and (self.turn == 'w'):
+                    score += self.piece_value_map[char.lower()]
+                elif (char.islower()) and (self.turn == 'b'):
+                    score += self.piece_value_map[char]
+                else:
+                    score -= self.piece_value_map[char]
+
+        return score
+
     def generate_possible_moves(self) -> list:
         possible_moves = []
         for piece_idx in range(len(self.board)):
@@ -112,7 +136,10 @@ class Board:
                         possible_moves.append(self.knight_moves(piece_idx))
                     case _:
                         possible_moves.append(self.sliding_moves(piece_idx))
-        return possible_moves
+
+        flattened = [i for x in possible_moves for i in x]
+        filtered = sorted(flattened, key=lambda x: x.rating, reverse=True)
+        return filtered
 
     def knight_moves(self, piece_idx: int) -> list:
         piece = self.board[piece_idx]
@@ -170,27 +197,65 @@ class Board:
                     break
         return possible_moves
 
+    def move(self, move: Move | str) -> None:
+        if isinstance(move, Move):
+            self.board = self.board[:move.start] + \
+                '.' + self.board[move.start + 1:]
+            self.board = self.board[:move.end] + \
+                move.start_piece + self.board[move.end + 1:]
+        elif isinstance(move, str):
+            start_idx = int(move)
+            if start_idx < len(self.board):
+                p = self.generate_possible_moves()
+                print(p)
+                end_idx = int(input('> '))
+
+                ends = [i.end for i in p]
+
+                e = self.board[start_idx]
+                if end_idx in ends:
+                    self.board = self.board[:start_idx] + \
+                        '.' + self.board[start_idx + 1:]
+                    self.board = self.board[:end_idx] + \
+                        e + self.board[end_idx + 1:]
+
+        self.turn = 'w' if self.turn == 'b' else 'w'
+
     def search(self) -> (int, int):
-        depth = 2
+        duplicate_board = Board(self.board)
+        duplicate_board.turn = self.turn
+        depth = 1
+        move = None
 
         def find() -> (int, int):
-            nonlocal depth
+            nonlocal depth, move
+
+            print(duplicate_board)
 
             if depth == 0:
-                return
+                d = duplicate_board.calculate_score()
+                return d
 
-            moves = self.generate_possible_moves()
-            flattened = [i for x in moves for i in x]
-            filtered = sorted(flattened, key=lambda x: x.rating)
-            print(filtered)
+            moves = duplicate_board.generate_possible_moves()
+            weights = [x.rating for x in moves]
+            choise = random.choices(moves, weights=weights, k=1)[0]
+
+            if move is None:
+                move = choise
+
+            duplicate_board.move(choise)
 
             depth -= 1
-            find()
+            return find()
 
-        find()
+        x = find()
+        return move
 
 
 if __name__ == '__main__':
     b = Board()
-    print(b)
-    b.search()
+
+    while True:
+        print(b)
+        b.move(input('> '))
+        b.move(b.search())
