@@ -105,10 +105,9 @@ class Board:
         out = ''
         k = 8
         for i in t:
-            j = i.strip(' ').split()
-            if j:
-                x = [n for n in j[0]]
-                out += str(k) + '| ' + ' '.join(x) + ' |\n'
+            if j := i.strip(' ').split():
+                x = list(j[0])
+                out += f'{str(k)}| ' + ' '.join(x) + ' |\n'
                 k -= 1
 
         return out + '  ----------------\n   a b c d e f g h'
@@ -140,8 +139,7 @@ class Board:
                         possible_moves.append(self.sliding_moves(piece_idx))
 
         flattened = [i for x in possible_moves for i in x]
-        filtered = sorted(flattened, key=lambda x: x.rating, reverse=True)
-        return filtered
+        return sorted(flattened, key=lambda x: x.rating, reverse=True)
 
     def knight_moves(self, piece_idx: int) -> list:
         piece = self.board[piece_idx]
@@ -200,25 +198,28 @@ class Board:
         return possible_moves
 
     def move(self, move: Move | str) -> None:
+        # sourcery skip: remove-redundant-condition
         if isinstance(move, Move):
             self.board = self.board[:move.start] + \
-                '.' + self.board[move.start + 1:]
+                    '.' + self.board[move.start + 1:]
             self.board = self.board[:move.end] + \
-                move.start_piece + self.board[move.end + 1:]
+                    move.start_piece + self.board[move.end + 1:]
         elif isinstance(move, str):
             start_idx = self.algebraic_to_idx(move)
             if start_idx < len(self.board):
-                p = filter(lambda x: x.start == start_idx,
-                           self.generate_possible_moves())
-                print(list(p))
-                end = input('> ')
-                end_idx = self.algebraic_to_idx(end)
-                m = Move(start_idx, end_idx, self)
-                self.move(m)
-
+                self.get_des_move_piece(start_idx)
         self.turn = 'w' if self.turn == 'b' else 'w'
 
-    def search(self) -> (int, int):
+    def get_des_move_piece(self, start_idx):
+        p = filter(lambda x: x.start == start_idx,
+                   self.generate_possible_moves())
+        print(list(p))
+        end = input('> ')
+        end_idx = self.algebraic_to_idx(end)
+        m = Move(start_idx, end_idx, self)
+        self.move(m)
+
+    def search(self) -> Move:
         duplicate_board = Board(self.board)
         duplicate_board.turn = self.turn
         depth = 1
