@@ -1,4 +1,4 @@
-import random
+import random, time
 
 
 class Move:
@@ -19,18 +19,20 @@ class Move:
             'k': map(lambda x: x*10, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3, -4, -4, -5, -5, -4, -4, -3, 0, 0, -3, -4, -4, -5, -5, -4, -4, -3, 0, 0, -3, -4, -4, -5, -5, -4, -4, -3, 0, 0, -3, -4, -4, -5, -5, -4, -4, -3, 0, 0, -2, -3, -3, -4, -4, -3, -3, -2, 0, 0, -1, -2, -2, -2, -2, -2, -2, -1, 0, 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 0, 2, 3, 1, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         }
         self.piece_value_map = {
-            'p': 1,
-            'n': 3,
-            'b': 3,
-            'r': 5,
-            'q': 9,
+            'p': 10,
+            'n': 30,
+            'b': 30,
+            'r': 50,
+            'q': 90,
             'k': 999999999,
-            '.': 0
+            '.': 0,
+            ' ': 0
         }
+        self.idx_to_algebraic = lambda idx: f'{chr(idx%10 + 96)}{9 - idx//10}'
         self.calculate_rating()
 
     def __repr__(self) -> str:
-        return f'{self.start}[{self.start_piece}] => {self.end}[{self.end_piece}](Rating:{self.rating})'
+        return f'{self.idx_to_algebraic(self.start)}[{self.start_piece}] => {self.idx_to_algebraic(self.end)}[{self.end_piece}](Rating:{self.rating})'
 
     def calculate_rating(self) -> None:
         square_table_start_index = self.start
@@ -78,12 +80,18 @@ class Board:
         self.invalid_indexes = list(filter(
             lambda x: x is not None, [i if n in '\n ' else None for i, n in enumerate(self.board)]))
         self.move_offsets = {
-            'p': ((-10, -11, -9, -20), 1),
+            'p': ((10, 11, 9, 20), 1),
             'n': ((-19, -21, -12, -8, 19, 21, 12, 8), 1),
-            'b': ((-11, -9, 9, 11), 7),
+            'b': ((11, 9, -9, -11), 7),
             'r': ((-10, 10, -1, 1), 7),
             'q': ((-11, -9, 9, 11, -10, 10, -1, 1), 7),
-            'k': ((-11, -9, 9, 11, -10, 10, -1, 1), 1)
+            'k': ((-11, -9, 9, 11, -10, 10, -1, 1), 1),
+            'P': ((-10, -11, -9, -20), 1),
+            'N': ((-19, -21, -12, -8, 19, 21, 12, 8), 1),
+            'B': ((-11, -9, 9, 11), 7),
+            'R': ((-10, 10, -1, 1), 7),
+            'Q': ((-11, -9, 9, 11, -10, 10, -1, 1), 7),
+            'K': ((-11, -9, 9, 11, -10, 10, -1, 1), 1)
         }
         self.white_score = 0
         self.black_score = 0
@@ -110,15 +118,34 @@ class Board:
                 out += f'{str(k)}| ' + ' '.join(x) + ' |\n'
                 k -= 1
 
-        return out + '  ----------------\n   a b c d e f g h'
+        return out + '  ----------------\n   a b c d e f g h\n--------------------------------------------------------------'
+    
+    def is_white(self, piece:str) -> bool:
+        if piece in 'KQRBNP':
+            return True
+        elif piece in 'kqrbnp':
+            return False
+        else:
+            return None
+        
+    def is_black(self, piece: str) -> bool:
+        if piece in 'kqrbnp':
+            return True
+        elif piece in 'KQRBNP':
+            return False
+        else:
+            return None
+
+    def toggle_turn(self) -> None:
+        self.turn = 'b' if self.turn == 'w' else 'w'
 
     def calculate_score(self) -> None:
         score = 0
         for char in self.board:
             if char.lower() in self.piece_value_map:
-                if (char.isupper()) and (self.turn == 'w'):
+                if self.is_white(char):
                     score += self.piece_value_map[char.lower()]
-                elif (char.islower()) and (self.turn == 'b'):
+                elif self.is_black(char):
                     score += self.piece_value_map[char]
                 else:
                     score -= self.piece_value_map[char]
@@ -129,7 +156,7 @@ class Board:
         possible_moves = []
         for piece_idx in range(len(self.board)):
             piece = self.board[piece_idx]
-            if (piece.isupper() and self.turn == 'w') or (piece.islower() and self.turn == 'b'):
+            if (self.is_white(piece) and self.turn == 'w') or (self.is_black(piece) and self.turn == 'b'):
                 match piece:
                     case 'p' | 'P':
                         possible_moves.append(self.pawn_moves(piece_idx))
@@ -144,13 +171,14 @@ class Board:
     def knight_moves(self, piece_idx: int) -> list:
         piece = self.board[piece_idx]
         possible_moves = []
-        for direction_offset in self.move_offsets[piece.lower()][0]:
+
+        for direction_offset in self.move_offsets[piece][0]:
             new_pos = piece_idx + direction_offset
-            if (new_pos not in self.invalid_indexes) and (new_pos < len(self.board)):
+            if (new_pos not in self.invalid_indexes) and (0 < new_pos < len(self.board)):
                 new_pos_piece = self.board[new_pos]
                 if new_pos_piece == '.':
                     possible_moves.append(Move(piece_idx, new_pos, self))
-                elif piece.isupper() == new_pos_piece.islower():
+                elif self.is_white(piece) == self.is_black(piece):
                     possible_moves.append(
                         Move(piece_idx, new_pos, self))
         return possible_moves
@@ -158,34 +186,34 @@ class Board:
     def pawn_moves(self, piece_idx: int) -> list:
         piece = self.board[piece_idx]
         possible_moves = []
-        if piece.islower() and piece_idx > 30:
-            self.move_offsets[piece.lower()] = self.move_offsets[piece.lower(
-            )][0][:-1], self.move_offsets[piece.lower()][1]
-        if piece.isupper() and piece_idx < 70:
-            self.move_offsets[piece.lower()] = self.move_offsets[piece.lower(
-            )][0][:-1], self.move_offsets[piece.lower()][1]
-        for direction_offset in self.move_offsets[piece.lower()][0]:
+
+        if self.is_black(piece) and piece_idx > 30:
+            self.move_offsets[piece] = self.move_offsets[piece][0][:-1], self.move_offsets[piece][1]
+        elif self.is_white(piece) and piece_idx < 70:
+            self.move_offsets[piece] = self.move_offsets[piece][0][:-1], self.move_offsets[piece][1]
+
+        for direction_offset in self.move_offsets[piece][0]:
             new_pos = piece_idx + direction_offset
-            if (new_pos not in self.invalid_indexes) and (new_pos < len(self.board)):
+
+            if (new_pos not in self.invalid_indexes) and (0 < new_pos < len(self.board)):
                 new_pos_piece = self.board[new_pos]
-                # One or Two moves straight
-                if (new_pos_piece == '.') and (direction_offset not in (-11, -9)):
+                if (new_pos_piece == '.') and (direction_offset not in (11, 9, -11, -9)):
                     possible_moves.append(Move(piece_idx, new_pos, self))
-                # Capture left or right
-                elif (piece.isupper() == new_pos_piece.islower()) and (direction_offset in (-11, -9)):
-                    possible_moves.append(
-                        Move(piece_idx, new_pos, self))
+                elif (self.is_white(piece) == self.is_black(new_pos_piece)) and (direction_offset in (11, 9, -11, -9)):
+                    possible_moves.append(Move(piece_idx, new_pos, self))
+                        
         return possible_moves
 
     def sliding_moves(self, piece_idx: int) -> list:
         piece = self.board[piece_idx]
         possible_moves = []
-        for direction_offset in self.move_offsets[piece.lower()][0]:
-            for offset_multiplier in range(1, self.move_offsets[piece.lower()][1] + 1):
+
+        for direction_offset in self.move_offsets[piece][0]:
+            for offset_multiplier in range(1, self.move_offsets[piece][1] + 1):
                 new_pos = piece_idx + direction_offset * offset_multiplier
-                if (new_pos not in self.invalid_indexes) and (new_pos < len(self.board)):
+                if (new_pos not in self.invalid_indexes) and (0 < new_pos < len(self.board)):
                     new_pos_piece = self.board[new_pos]
-                    if piece.isupper() == new_pos_piece.islower():
+                    if self.is_white(piece) == self.is_black(new_pos_piece):
                         possible_moves.append(
                             Move(piece_idx, new_pos, self))
                         break
@@ -201,14 +229,16 @@ class Board:
         # sourcery skip: remove-redundant-condition
         if isinstance(move, Move):
             self.board = self.board[:move.start] + \
-                    '.' + self.board[move.start + 1:]
+                '.' + self.board[move.start + 1:]
             self.board = self.board[:move.end] + \
-                    move.start_piece + self.board[move.end + 1:]
+                move.start_piece + self.board[move.end + 1:]
+
+            self.toggle_turn()
+
         elif isinstance(move, str):
             start_idx = self.algebraic_to_idx(move)
             if start_idx < len(self.board):
                 self.get_des_move_piece(start_idx)
-        self.turn = 'w' if self.turn == 'b' else 'w'
 
     def get_des_move_piece(self, start_idx):
         p = filter(lambda x: x.start == start_idx,
@@ -251,7 +281,11 @@ class Board:
 if __name__ == '__main__':
     b = Board()
 
+    print(b)
     while True:
-        print(b)
-        b.move(input('> '))
         b.move(b.search())
+        print(b)
+        time.sleep(3)
+        b.move(b.search())
+        print(b)
+        time.sleep(3)
