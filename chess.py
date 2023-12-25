@@ -97,6 +97,8 @@ class Board:
             'k': 999999999,
             '.': 0
         }
+        self.algebraic_to_idx = lambda AN: -10 * int(AN[1]) + ord(AN[0]) - 6
+        self.idx_to_algebraic = lambda idx: f'{chr(idx%10 + 96)}{9 - idx//10}'
 
     def __repr__(self) -> str:
         t = self.board.split('\n')
@@ -204,20 +206,15 @@ class Board:
             self.board = self.board[:move.end] + \
                 move.start_piece + self.board[move.end + 1:]
         elif isinstance(move, str):
-            start_idx = int(move)
+            start_idx = self.algebraic_to_idx(move)
             if start_idx < len(self.board):
-                p = self.generate_possible_moves()
-                print(p)
-                end_idx = int(input('> '))
-
-                ends = [i.end for i in p]
-
-                e = self.board[start_idx]
-                if end_idx in ends:
-                    self.board = self.board[:start_idx] + \
-                        '.' + self.board[start_idx + 1:]
-                    self.board = self.board[:end_idx] + \
-                        e + self.board[end_idx + 1:]
+                p = filter(lambda x: x.start == start_idx,
+                           self.generate_possible_moves())
+                print(list(p))
+                end = input('> ')
+                end_idx = self.algebraic_to_idx(end)
+                m = Move(start_idx, end_idx, self)
+                self.move(m)
 
         self.turn = 'w' if self.turn == 'b' else 'w'
 
@@ -229,8 +226,6 @@ class Board:
 
         def find() -> (int, int):
             nonlocal depth, move
-
-            print(duplicate_board)
 
             if depth == 0:
                 d = duplicate_board.calculate_score()
