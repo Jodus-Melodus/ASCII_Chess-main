@@ -152,7 +152,7 @@ class Board:
 
         return score
 
-    def generate_possible_moves(self) -> list:
+    def generate_possible_moves(self) -> list[Move]:
         possible_moves = []
         for piece_idx in range(len(self.board)):
             piece = self.board[piece_idx]
@@ -226,7 +226,6 @@ class Board:
         return possible_moves
 
     def move(self, move: Move | str) -> None:
-        # sourcery skip: remove-redundant-condition
         if isinstance(move, Move):
             self.board = self.board[:move.start] + \
                 '.' + self.board[move.start + 1:]
@@ -239,6 +238,15 @@ class Board:
             start_idx = self.algebraic_to_idx(move)
             if start_idx < len(self.board):
                 self.get_des_move_piece(start_idx)
+
+    def unmake_move(self, move: Move | str) -> None:
+        if isinstance(move, Move):
+            self.board = self.board[:move.end] + \
+                '.' + self.board[move.end + 1:]
+            self.board = self.board[:move.start] + \
+                move.start_piece + self.board[move.start + 1:]
+
+            self.toggle_turn()
 
     def get_des_move_piece(self, start_idx):
         p = filter(lambda x: x.start == start_idx,
@@ -253,39 +261,36 @@ class Board:
         duplicate_board = Board(self.board)
         duplicate_board.turn = self.turn
         depth = 1
-        move = None
 
-        def find() -> (int, int):
-            nonlocal depth, move
-
+        def find(depth:int, move:Move=None) -> Move:
             if depth == 0:
-                d = duplicate_board.calculate_score()
-                return d
-
+                return move
+            
             moves = duplicate_board.generate_possible_moves()
-            weights = [x.rating for x in moves]
-            choise = random.choices(moves, weights=weights, k=1)[0]
+            best_move = None
 
-            if move is None:
-                move = choise
+            for move in moves:
+                duplicate_board.move(move)
+                move = find(depth - 1, move)
 
-            duplicate_board.move(choise)
+                if best_move is None:
+                    best_move = move
+                elif move.rating > best_move.rating:
+                    best_move = move
 
-            depth -= 1
-            return find()
+                duplicate_board.unmake_move(move)
 
-        x = find()
-        return move
+            return best_move
+        
+        best_move = find(depth)
+        return best_move
 
 
 if __name__ == '__main__':
     b = Board()
 
-    print(b)
     while True:
-        b.move(b.search())
         print(b)
-        time.sleep(3)
-        b.move(b.search())
+        b.move(input('> '))
         print(b)
-        time.sleep(3)
+        b.move(b.search())
