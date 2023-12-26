@@ -1,5 +1,5 @@
 import random, time
-
+import chessboard
 
 class Move:
     def __init__(self, start: int, end: int, board) -> None:
@@ -48,16 +48,17 @@ class Move:
                 self.piece_square_table[self.start_piece.lower()])
 
         if end_piece_val > start_piece_val:
+            self.rating += end_piece_val * 2
+        else:
             self.rating += end_piece_val
 
-        if square_table[square_table_end_index] > square_table[square_table_start_index]:
-            self.rating += square_table[square_table_end_index] - \
-                square_table[square_table_start_index]
-        elif square_table[square_table_end_index] < square_table[square_table_start_index]:
-            self.rating += square_table[square_table_start_index] - \
-                square_table[square_table_end_index]
-        else:
-            self.rating += 0
+        if (
+            square_table[square_table_end_index]
+            > square_table[square_table_start_index]
+            or square_table[square_table_end_index]
+            < square_table[square_table_start_index]
+        ):
+            self.rating += square_table[square_table_end_index]
 
 
 class Board:
@@ -143,13 +144,12 @@ class Board:
         score = 0
         for char in self.board:
             if char.lower() in self.piece_value_map:
-                if self.is_white(char):
+                if self.turn == 'w' and self.is_white(char):
                     score += self.piece_value_map[char.lower()]
-                elif self.is_black(char):
-                    score += self.piece_value_map[char]
+                elif self.turn == 'b' and self.is_black(char):
+                    score += self.piece_value_map[char.lower()]
                 else:
-                    score -= self.piece_value_map[char]
-
+                    score -= self.piece_value_map[char.lower()]
         return score
 
     def generate_possible_moves(self) -> list[Move]:
@@ -178,9 +178,10 @@ class Board:
                 new_pos_piece = self.board[new_pos]
                 if new_pos_piece == '.':
                     possible_moves.append(Move(piece_idx, new_pos, self))
-                elif self.is_white(piece) == self.is_black(piece):
+                elif self.is_white(piece) == self.is_black(new_pos_piece):
                     possible_moves.append(
-                        Move(piece_idx, new_pos, self))
+                        Move(piece_idx, new_pos, self))               
+    
         return possible_moves
 
     def pawn_moves(self, piece_idx: int) -> list:
@@ -238,6 +239,9 @@ class Board:
             start_idx = self.algebraic_to_idx(move)
             if start_idx < len(self.board):
                 self.get_des_move_piece(start_idx)
+        else:
+            raise ValueError("Invalid argument")
+            
 
     def unmake_move(self, move: Move | str) -> None:
         if isinstance(move, Move):
@@ -260,37 +264,37 @@ class Board:
     def search(self) -> Move:
         duplicate_board = Board(self.board)
         duplicate_board.turn = self.turn
-        depth = 1
+        depth = 3
 
-        def find(depth:int, move:Move=None) -> Move:
+        def find(depth: int, move: Move = None) -> Move:
             if depth == 0:
                 return move
-            
+
             moves = duplicate_board.generate_possible_moves()
             best_move = None
+            best_score = float('-inf')
 
             for move in moves:
                 duplicate_board.move(move)
-                move = find(depth - 1, move)
+                score = duplicate_board.calculate_score()
 
-                if best_move is None:
-                    best_move = move
-                elif move.rating > best_move.rating:
+                if score > best_score:
+                    best_score = score
                     best_move = move
 
                 duplicate_board.unmake_move(move)
 
             return best_move
-        
+
         best_move = find(depth)
         return best_move
 
 
+
 if __name__ == '__main__':
     b = Board()
+    cb = chessboard.Chessboard()
 
     while True:
-        print(b)
-        b.move(input('> '))
-        print(b)
+        cb.paint(b.board)
         b.move(b.search())
